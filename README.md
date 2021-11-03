@@ -38,7 +38,7 @@ $ sudo yum install $( cat ./INSTALL )
 ## Configuration
 The `git-deploy.config.json` file lives in your bare git repo (e.g. `/home/git/project-owner/project.git/`, the same as the working directory for your git-hooks), allowing for per-project configuration. If a config file isn't found there, it'll check its own directory and use that.
 
-```json
+```js
 {
   // base url of your repo, used for constructing the Merge Request link
   "repoURL": "https://gogs.example.com",
