@@ -1,0 +1,4 @@
+HEAD
+.env
+*.pipe
+git-deploy.config.json

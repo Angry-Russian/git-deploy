@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+
+# Simple deploy script for use as a git hook in a wordpress project hosted on Gogs.
+
+project_root="$( realpath "$( dirname "$( realpath $0)" )/.." )" # probably want to set this to something like /opt/git-deploy
+source "$project_root/libs/require.sh"
+
+require -o ".env";
+require "libs/debug.sh"
+require "libs/log.sh"
+require "libs/checks.sh"
+
+sanitize () {
+  local sanitized=()
+  for token; do
+    sanitized+=( "$(printf '%q' "$token")" )
+  done
+  printf '%s\n' "${sanitized[*]}"
+}
+
+config () {
+    log note "looking for config file..."
+    if [[ -f $( realpath ./git-deploy.config.json ) ]]; then
+        log note "Found";
+        config_file=$( realpath ./git-deploy.config.json )
+    elif [[ -f "${project_root}/git-deploy.config.json" ]]; then
+        log note "Found in ${project_root}/git-deploy.config.json";
+        config_file="${project_root}/git-deploy.config.json"
+    else
+        log error "Config file not found in either repo directory or git-deploy directory, exiting."
+        exit 1;
+    fi
+
+    listener="$( jq -r ".deployPipe" $config_file )"
+}
+
+main () {
+    exit_code=0;
+    while read oldrev newrev ref
+    do
+        echo "Running hook with $oldrev $newrev $ref"
+        currentBranch="$( echo $ref | grep -oP '^refs/heads/\K(.*)$' )"
+        deploy_config="$( jq -r ".targets[\"$currentBranch\"]?.folder" $config_file )"
+        user="$( jq -r ".targets[\"$currentBranch\"]?.user" $config_file )" # will be "null" if the ref doesn't match an index
+        dest="$( jq -r ".targets[\"$currentBranch\"]?.folder" $config_file )"
+
+        repo_name=${GOGS_REPO_NAME:-"$( basename ${PWD%.git} )"}
+        repo_owner=${GOGS_REPO_OWNER_NAME:-"$( basename ${PWD%.git} )"}
+        repo_url="$( jq -r ".repoURL" $config_file )"
+
+        pre_deploy="$( jq -r ".targets[\"$currentBranch\"]?.preDeploy" $config_file )"
+        poste_deploy="$( jq -r ".targets[\"$currentBranch\"]?.postDeploy" $config_file )"
+
+        # substitute templated variables in script by those found in targets[branch]
+        pre_deploy="$( echo "$pre_deploy" | sed -e "s|{repoName}|${repo_name}|" )"
+        pre_deploy="$( echo "$pre_deploy" | sed -e "s|{repoURL}|${repo_url}|" )"
+        pre_deploy="$( echo "$pre_deploy" | sed -e "s|{repoOwner}|${repo_owner}|" )"
+        pre_deploy="$( echo "$pre_deploy" | sed -e "s|{branch}|${currentBranch}|" )"
+
+        # create a bash array for all the keys in the targets[branch] config object and
+        declare -a keys=( $( jq -cr ".targets[\"$currentBranch\"] | keys | @tsv" $config_file ) )
+        for key in ${keys[@]}; do
+            value="$( jq -cr ".targets[\"$currentBranch\"].$key" $config_file )"
+            if [[ "$key" != "preDeploy" && "$key" != "postDeploy" ]]; then
+                pre_deploy="$( echo "$pre_deploy" | sed -e "s|{$key}|$value|" )"
+            fi;
+        done;
+
+        log note "running pre-deploy script: '$pre_deploy'";
+        pre_deploy_cmd=($pre_deploy)
+        eval "$( sanitize "${pre_deploy_cmd[@]}" )"
+
+        if [[ $user == 'null' || dest == 'null' ]]; then
+            defaultBranch=$( cat HEAD | grep -oP 'refs/heads/\K(.*)' );
+            log note '==================================================='
+            log note " To create a Pull Request for ${repo_name} with this branch, go to"
+            log note " ${repo_url}/${repo_owner}/${repo_name}/compare/${defaultBranch}...${currentBranch}"
+            log note '==================================================='
+
+        elif [[ ! -p $listener ]]; then
+            log -n error "Expected pipe"
+            log -n warn " $listener "
+            log error "not found!"
+            log error "Either the deploy service is not running or the pipe was deleted."
+            log error "Cannot deploy configured pipeline."
+            log note "Your commit is safe though, don't worry."
+            exit_code=126;
+
+        else
+            log -n note "Deploying"
+            log -n "$repo_name"
+            log -n note "to"
+            log "$dest"
+            log ok "Adding $newrev to deployment pipeline for $dest"
+            echo "$user $PWD $dest $newrev" >> $listener
+        fi
+    done
+    exit $exit_code;
+}
+
+# if script is being called (not sourced), run main.
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    check_requirements || {
+        log error "Missing requirements, cannot proceed."
+        exit 1;
+    }
+    config && main;
+fi;

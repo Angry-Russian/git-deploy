@@ -1,0 +1,20 @@
+{
+    "repoURL": "https://gogs.example.com",
+
+    "deployUser": "git",
+    "deployGroup": "www-data",
+    "deployPipe": "/tmp/git-deploy.pipe",
+
+    "trackUpdates": true,
+    "trackBranch": "master",
+
+    "targets": {
+        "master": {
+            "user": "git",
+            "folder": "/home/test/public_html/project_subfolder/or/something/",
+            "url": "https://prod.url.to/my/project",
+            "preDeploy": "",
+            "postDeploy": ""
+        }
+    }
+}
