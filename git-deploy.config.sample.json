@@ -1,6 +1,8 @@
 {
     "repoURL": "https://gogs.example.com",
 
+    "gitEnv": null,
+
     "deployUser": "git",
     "deployGroup": "www-data",
     "deployPipe": "/tmp/git-deploy.pipe",

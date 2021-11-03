@@ -7,14 +7,18 @@ For permissions reasons, git-deploy is split into 2 parts: the hook and the list
 The hook is usually run as the `git` user, meaning it doesn't have write access to any of the directories you would usually want to deploy to, like `/var/www/html` or `/home/mysite/public_html`.
 To get around this, a simple bash service creates a named pipe and listens to it for deployment instructions. The service runs as root, so it can place the files where they need to go.
 
-## Requirements
-- [git](https://git-scm.com/), necessary for your bare repo and for running the hook
+## Dependencies
+Running in production:
+- [git](https://git-scm.com/) necessary for your bare repo and for running the hook
 - [jq](https://stedolan.github.io/jq/) for parsing the JSON config file
 
 an easy way to install these dependencies: is to `cat` the file into your package manager. Example:
 ```bash
 $ sudo yum install $( cat ./INSTALL )
 ```
+
+## Dev Dependencies
+- [Docker](https://docs.docker.com/get-docker/) is used for running unit tests, using [shUnit2](https://github.com/kward/shunit2)
 
 ## Installation
 - Copy this project's contents into a file structure of your choice, usually `/opt/git-deploy`
@@ -43,6 +47,9 @@ The `git-deploy.config.json` file lives in your bare git repo (e.g. `/home/git/p
   // base url of your repo, used for constructing the Merge Request link
   "repoURL": "https://gogs.example.com",
 
+  // name of git environment. Right now the only thing this does is if it's set to "gogs" it prints a "create merge request at [url]" message.
+  "gitEnv": "",
+
   // user and group to which the pipe belongs, defines who'll be able to write to the pipe
   "deployUser": "git",
   "deployGroup": "www-data",
@@ -68,8 +75,8 @@ The `git-deploy.config.json` file lives in your bare git repo (e.g. `/home/git/p
       "url": "https://prod.url.to/my/project",
 
       // more hooks for scripts
-      "pre-deploy": "/path/to/file",
-      "post-deploy": "/path/to/file --url {url}"
+      "preDeploy": "/path/to/file",
+      "postDeploy": "/path/to/file --url {url}"
       ... // feel free to define your own keys, they'll be made accessible to your scripts through template substitution
     },
     "develop": { ... }
@@ -90,6 +97,29 @@ First, install the hook in a repo you want deployed
   /opt/git-deploy/hooks/post-receive <&0
   ```
 
+### Substitution Variables
+When using pre- and post-deploy scripts, you'll have access to the following template variables
+
+|var name     |description|
+|-|-|
+| `repoName`  | name of the git repo's folder. If the folder ends in `.git` that extension is trimed |
+| `repoOwner` | the folder that contains the git repo, e.g. `git` if your repo is in `/home/git/repo.git` |
+| `repoURL`   | an external url that your repo can be reached at, currently only useful for gogs. Corresponds to the same value as the one in `git-deploy.config.json` |
+| `branch`    | the git branch being deployed |
+| `gitEnv`    | Whatever env is set in your `git-deploy.config.json` |
+| `...`       | any extra variable added to the `target[branch]` config will also be made accessible |
+
+which can be invoked like so:
+```js
+{
+  "preDeploy": "/path/to/my/script \"{repoName}/{branch}\""
+}
+```
+for a repo `Foo` on branch `Bar`, that script will resolve to
+```bash
+/path/to/my/script "Foo/Bar"
+```
+
 ## Limitations
 - If you're using Gogs, Merge Requests don't fire hooks. You'll want to merge and push manually for the post-receive hook to fire.
 
@@ -97,9 +127,11 @@ First, install the hook in a repo you want deployed
 Pull requests are welcome! Right now it's set up for Gogs and Systemd, and broader support is a major goal.
 Please make sure to update tests as appropriate.
 
+A dockerfile is included for running unit tests using shunit2
+
 ## Q&A
 - **Q:** Do you dogfood?
   **A:** Yes, these are the scripts I personally use for deployment when a CI/CD infrastructure isn't available
 
 ## License
-[MIT](https://choosealicense.com/licenses/mit/)
+[MIT](https://choo sealicense.com/licenses/mit/)

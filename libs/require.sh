@@ -7,10 +7,7 @@ fi;
 logPath="$( realpath "$project_root/libs/log.sh" )"
 source "$logPath"
 
-declare -a required=(
-    "$( realpath "$project_root/libs/require.sh" )"
-    "$logPath"
-);
+declare -a required=( "$( realpath "$project_root/libs/require.sh" )" "$logPath" );
 
 require () {
     optional=false
@@ -22,20 +19,23 @@ require () {
 
     path="$( realpath "$project_root/$1" )"
 
+    log -r note   "[  ....  ] sourcing $( $optional && echo "optional " )file '$path'"
     if [[ -f "$path" ]]; then
         for p in "${required[@]}"
         do
-            [[ "$p" == "$path" ]] && log note "file '$path' already loaded" && return 0;
+            [[ "$p" == "$path" ]] && {
+                log note "[ ✗ dupe ]"
+            } && return 0;
         done;
-        log note "sourcing $( $optional && echo "optional" ) file '$path'"
+        log ok    "[ ✓ done ]"
         source "$path"
         required+=("$path")
 
     elif $optional; then
-        log note "Tried to require optional '$path' but it wasn't found."
+        log note  "[ ✗ opt  ]"
 
     else
-        log error "$path not found"
+        log error "[ ✘ err  ]"
         exit 1;
     fi;
 }

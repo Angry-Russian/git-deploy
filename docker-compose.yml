@@ -1,0 +1,9 @@
+version: '3.3'
+
+services:
+  test:
+    image: alpine:latest
+    working_dir: /opt/git-deploy
+    volumes:
+      - ./:/opt/git-deploy
+    command: /bin/sh -c "apk add --no-cache bash && ./docker-entrypoint.sh"

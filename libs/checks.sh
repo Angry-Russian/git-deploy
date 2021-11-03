@@ -26,16 +26,19 @@ check_requirements () {
 }
 
 check_updates () {
-    # 86400 = 24 hours in seconds
-    if [[ $( date +%s ) -gt "$(( $( date +%s ) - 86400 ))" ]]; then
-        return 0;
-    else
+    while true; do
+
+        log good "Checking updates"
         UPDATES_LAST_CHECK=$( date +%s )
         git fetch
         my_version="$(git rev-parse master)"
         server_version="$(git rev-parse origin/master)"
         if [[ "$my_version" != "$server_version" ]]; then
-            git pull
+            git pull "$1" "$2"
         fi;
-    fi;
+        # 3600 = 1 hour in seconds
+        # 86400 = 24 hours in seconds
+        sleep 3600;
+
+    done;
 }

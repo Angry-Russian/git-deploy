@@ -17,9 +17,12 @@ config () {
     trap 'cleanup' EXIT
 
     config_file="${project_root}/git-deploy.config.json"
+    track_updates=$( jq -r ".trackUpdates" $config_file )
+    track_branch=$( jq -r ".trackBranch" $config_file )
     user=$( jq -r ".deployUser" $config_file )
     group=$( jq -r ".deployGroup" $config_file )
     listener=$( jq -r ".deployPipe" $config_file )
+    updates_PID=''
 
     if [[ ! -p "$listener" ]]; then
         mkfifo -m 775 "${listener:-/tmp/git-deploy.pipe}"
@@ -30,13 +33,22 @@ config () {
 cleanup() {
     EXEC=false
     log note "loop terminated, cleaning up..."
-    rm -v "$listener"
+    if [[ ! -p "$listener" ]]; then
+        rm -v "$listener"
+    fi;
+    if [[ -n "$updates_PID" ]]; then
+        kill -9 $updates_PID
+        updates_PID=''
+    fi;
     log note "... done."
 }
 
 read_pipe () {
     if read usr src dst rev < $listener; then
-        if [[ "$usr" == "exit" ]]; then exit 0; fi;
+        if [[ "$usr" == "exit" || ! $EXEC ]]; then
+            EXEC=false;
+            return 0;
+        fi;
 
         log note "Running deploy script in $PWD"
         log ok   "Deploying $rev from $src to $dst as $usr";
@@ -49,9 +61,9 @@ read_pipe () {
 }
 
 main () {
+    log ok "Running main loop"
     while $EXEC
     do
-        check_updates;
         read_pipe;
     done
 }
@@ -62,5 +74,13 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
         log error "Missing requirements, cannot proceed."
         exit 1;
     }
-    config && main
+    config && {
+        [[ "$track_updates" == "true" ]] && {
+            # check if update script already running by checking PID
+            # if not, launch it, save its PID
+            if [[ -n "$updates_PID" ]]; then
+                check_updates origin "$track_branch" & updates_PID="$!"
+            fi;
+        } || log note "not tracking updates";
+    } && main
 fi;

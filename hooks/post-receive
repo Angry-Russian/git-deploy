@@ -43,9 +43,10 @@ main () {
         deploy_config="$( jq -r ".targets[\"$currentBranch\"]?.folder" $config_file )"
         user="$( jq -r ".targets[\"$currentBranch\"]?.user" $config_file )" # will be "null" if the ref doesn't match an index
         dest="$( jq -r ".targets[\"$currentBranch\"]?.folder" $config_file )"
+        git_env="$( jq -r ".gitEnv" $config_file )"
 
         repo_name=${GOGS_REPO_NAME:-"$( basename ${PWD%.git} )"}
-        repo_owner=${GOGS_REPO_OWNER_NAME:-"$( basename ${PWD%.git} )"}
+        repo_owner=${GOGS_REPO_OWNER_NAME:-"$( basename ${repo_name} )"}
         repo_url="$( jq -r ".repoURL" $config_file )"
 
         pre_deploy="$( jq -r ".targets[\"$currentBranch\"]?.preDeploy" $config_file )"
@@ -56,6 +57,7 @@ main () {
         pre_deploy="$( echo "$pre_deploy" | sed -e "s|{repoURL}|${repo_url}|" )"
         pre_deploy="$( echo "$pre_deploy" | sed -e "s|{repoOwner}|${repo_owner}|" )"
         pre_deploy="$( echo "$pre_deploy" | sed -e "s|{branch}|${currentBranch}|" )"
+        pre_deploy="$( echo "$pre_deploy" | sed -e "s|{gitEnv}|${git_env}|" )"
 
         # create a bash array for all the keys in the targets[branch] config object and
         declare -a keys=( $( jq -cr ".targets[\"$currentBranch\"] | keys | @tsv" $config_file ) )
@@ -72,10 +74,12 @@ main () {
 
         if [[ $user == 'null' || dest == 'null' ]]; then
             defaultBranch=$( cat HEAD | grep -oP 'refs/heads/\K(.*)' );
-            log note '==================================================='
-            log note " To create a Pull Request for ${repo_name} with this branch, go to"
-            log note " ${repo_url}/${repo_owner}/${repo_name}/compare/${defaultBranch}...${currentBranch}"
-            log note '==================================================='
+            if [[ "$git_env" == "gogs" ]]; then
+                log note '==================================================='
+                log note " To create a Pull Request for ${repo_name} with this branch, go to"
+                log note " ${repo_url}/${repo_owner}/${repo_name}/compare/${defaultBranch}...${currentBranch}"
+                log note '==================================================='
+            fi;
 
         elif [[ ! -p $listener ]]; then
             log -n error "Expected pipe"
