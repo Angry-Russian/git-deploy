@@ -44,24 +44,34 @@ cleanup() {
 }
 
 read_pipe () {
-    if read usr src dst rev < $listener; then
+    if read usr src dst rev post_deploy < $listener; then
         if [[ "$usr" == "exit" || ! $EXEC ]]; then
             EXEC=false;
             return 0;
         fi;
 
-        log note "Running deploy script in $PWD"
-        log ok   "Deploying $rev from $src to $dst as $usr";
-        oldref=$( cat "$src/HEAD" | { read a b; [[ -n "$b" ]] && echo "$b" || echo "$a"; } );
-        mkdir -p "$dst"
-        git --git-dir="$src" --work-tree="$dst" checkout -f "$rev" # <- checks out the project in target folder
-        git --git-dir="$src" symbolic-ref -q HEAD "$oldref" # <- fixes a bug where gogs thought the incoming rev was the new default rev
-        chown $usr:nobody -R "$dst"
+        # check that the user, source and the revision actually exist
+        if [[ ! $( id -u "${usr%:*}" ) ]]; then
+            log error "supplied user doesn't exist, ignoring.";
+        elif [[ ! $( git --git-dir="$src" log -n1 > /dev/null 2>&1 ) ]]; then
+            log error "supplied dir is not a git dir or has no commits";
+        elif [[ ! $( git --git-dir="$src" show "$rev" > /dev/null 2>&1 ) ]]; then
+            log error "supplied dir does not contain the target revision";
+        else
+            log note "Running deploy script in $PWD"
+            log ok   "Deploying $rev from $src to $dst as $usr";
+            oldref=$( cat "$src/HEAD" | { read a b; [[ -n "$b" ]] && echo "$b" || echo "$a"; } );
+            mkdir -p "$dst"
+            chown "$usr" -R "$dst"
+            git --git-dir="$src" --work-tree="$dst" checkout -f "$rev" # <- checks out the project in target folder
+            git --git-dir="$src" symbolic-ref -q HEAD "$oldref" # <- fixes a bug where gogs thought the incoming rev was the new default rev
+            chown "$usr" -R "$dst"
+        fi;
     fi
 }
 
 main () {
-    log ok "Running main loop"
+    log ok "Running main loop, listening on $listener"
     while $EXEC
     do
         read_pipe;
