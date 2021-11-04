@@ -26,7 +26,7 @@ log () {
     esac
 
 
-    simple_string=$( echo -e "$@" | strings )
+    simple_string="$( echo -e "$@" )"
     printf "$string"
     if [[ $return_home == true ]]; then
         echo -ne "\e[${#simple_string}D"
