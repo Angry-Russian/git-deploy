@@ -3,6 +3,7 @@ version: '3.3'
 services:
   test:
     image: alpine:latest
+    container_name: git-deploy-tests
     working_dir: /opt/git-deploy
     volumes:
       - ./:/opt/git-deploy
