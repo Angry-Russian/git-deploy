@@ -9,14 +9,8 @@ require -o ".env";
 require "libs/debug.sh"
 require "libs/log.sh"
 require "libs/checks.sh"
+require "libs/sanitize.sh"
 
-sanitize () {
-  local sanitized=()
-  for token; do
-    sanitized+=( "$(printf '%q' "$token")" )
-  done
-  printf '%s\n' "${sanitized[*]}"
-}
 
 config () {
     log note "looking for config file..."
@@ -31,46 +25,64 @@ config () {
         exit 1;
     fi
 
+    declare -a available_keys=(  )
     listener="$( jq -r ".deployPipe" $config_file )"
+}
+
+substitute () {
+    # substitute templated variables in script by those found in targets[branch]
+    __script="$( echo "$@" | \
+        sed -e "s|{repoName}|${repo_name}|"\
+            -e "s|{repoURL}|${repo_url}|"\
+            -e "s|{repoOwner}|${repo_owner}|"\
+            -e "s|{branch}|${currentBranch}|"\
+            -e "s|{gitEnv}|${git_env}|"\
+    )"
+
+    # create a bash array for all the keys in the targets[branch] config object and
+    for key in ${available_keys[@]}; do
+        value="$( jq -cr ".targets[\"$currentBranch\"].$key" $config_file )"
+        if [[ "$key" != "preDeploy" && "$key" != "postDeploy" ]]; then
+            __script="$( echo "$__script" | sed -e "s|{$key}|$value|" )"
+        fi;
+    done;
+    echo $__script;
 }
 
 main () {
     exit_code=0;
     while read oldrev newrev ref
     do
-        echo "Running hook with $oldrev $newrev $ref"
         currentBranch="$( echo $ref | grep -oP '^refs/heads/\K(.*)$' )"
+        available_keys=( $( jq -cr ".targets[\"$currentBranch\"] | keys | @tsv" $config_file ) )
         deploy_config="$( jq -r ".targets[\"$currentBranch\"]?.folder" $config_file )"
         user="$( jq -r ".targets[\"$currentBranch\"]?.user" $config_file )" # will be "null" if the ref doesn't match an index
+        group="$( jq -r ".targets[\"$currentBranch\"]?.group" $config_file )" # will be "null" if the ref doesn't match an index
         dest="$( jq -r ".targets[\"$currentBranch\"]?.folder" $config_file )"
         git_env="$( jq -r ".gitEnv" $config_file )"
+
+        src="$( realpath $PWD )"
 
         repo_name=${GOGS_REPO_NAME:-"$( basename ${PWD%.git} )"}
         repo_owner=${GOGS_REPO_OWNER_NAME:-"$( basename ${repo_name} )"}
         repo_url="$( jq -r ".repoURL" $config_file )"
 
         pre_deploy="$( jq -r ".targets[\"$currentBranch\"]?.preDeploy" $config_file )"
-        poste_deploy="$( jq -r ".targets[\"$currentBranch\"]?.postDeploy" $config_file )"
+        if [[ -n "$pre_deploy" ]]; then
+            pre_deploy=$( substitute "$pre_deploy" )
+            log note "running pre-deploy script: '$pre_deploy'";
+            run_sanitized "$pre_deploy"
+        else
+            pre_deploy=''
+        fi;
 
-        # substitute templated variables in script by those found in targets[branch]
-        pre_deploy="$( echo "$pre_deploy" | sed -e "s|{repoName}|${repo_name}|" )"
-        pre_deploy="$( echo "$pre_deploy" | sed -e "s|{repoURL}|${repo_url}|" )"
-        pre_deploy="$( echo "$pre_deploy" | sed -e "s|{repoOwner}|${repo_owner}|" )"
-        pre_deploy="$( echo "$pre_deploy" | sed -e "s|{branch}|${currentBranch}|" )"
-        pre_deploy="$( echo "$pre_deploy" | sed -e "s|{gitEnv}|${git_env}|" )"
+        post_deploy="$( jq -r ".targets[\"$currentBranch\"]?.postDeploy" $config_file )"
+        if [[ -n "$pre_deploy" ]]; then
+            post_deploy="$( substitute "$post_deploy" )"
+        else
+            post_deploy=''
+        fi;
 
-        # create a bash array for all the keys in the targets[branch] config object and
-        declare -a keys=( $( jq -cr ".targets[\"$currentBranch\"] | keys | @tsv" $config_file ) )
-        for key in ${keys[@]}; do
-            value="$( jq -cr ".targets[\"$currentBranch\"].$key" $config_file )"
-            if [[ "$key" != "preDeploy" && "$key" != "postDeploy" ]]; then
-                pre_deploy="$( echo "$pre_deploy" | sed -e "s|{$key}|$value|" )"
-            fi;
-        done;
-
-        log note "running pre-deploy script: '$pre_deploy'";
-        pre_deploy_cmd=($pre_deploy)
-        eval "$( sanitize "${pre_deploy_cmd[@]}" )"
 
         if [[ $user == 'null' || dest == 'null' ]]; then
             defaultBranch=$( cat HEAD | grep -oP 'refs/heads/\K(.*)' );
@@ -92,11 +104,11 @@ main () {
 
         else
             log -n note "Deploying"
-            log -n "$repo_name"
+            log -n " $repo_name "
             log -n note "to"
-            log "$dest"
-            log ok "Adding $newrev to deployment pipeline for $dest"
-            echo "$user $PWD $dest $newrev" >> $listener
+            log " $dest"
+            log ok "Adding $newrev to deployment pipeline for $dest at pipe $listener"
+            echo "$user:$group $src $dest $newrev $post_deploy" >> $listener
         fi
     done
     exit $exit_code;

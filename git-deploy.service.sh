@@ -10,6 +10,7 @@ require "libs/require.sh"
 require "libs/debug.sh"
 require "libs/log.sh"
 require "libs/checks.sh"
+require "libs/sanitize.sh"
 
 EXEC=true
 
@@ -66,6 +67,14 @@ read_pipe () {
             git --git-dir="$src" --work-tree="$dst" checkout -f "$rev" # <- checks out the project in target folder
             git --git-dir="$src" symbolic-ref -q HEAD "$oldref" # <- fixes a bug where gogs thought the incoming rev was the new default rev
             chown "$usr" -R "$dst"
+
+            if [[ -n "$post_deploy" ]]; then
+                log note "running pre-deploy script: '$post_deploy'";
+                (
+                    cd "$dst";
+                    run_sanitized "$post_deploy"
+                )
+            fi;
         fi;
     fi
 }
