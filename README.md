@@ -134,4 +134,4 @@ A dockerfile is included for running unit tests using shunit2
   **A:** Yes, these are the scripts I personally use for deployment when a CI/CD infrastructure isn't available
 
 ## License
-[MIT](https://choo sealicense.com/licenses/mit/)
+[MIT](https://choosealicense.com/licenses/mit/)
