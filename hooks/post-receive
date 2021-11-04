@@ -58,7 +58,6 @@ main () {
         deploy_config="$( jq -r ".targets[\"$currentBranch\"]?.folder" $config_file )"
         user="$( jq -r ".targets[\"$currentBranch\"]?.user" $config_file )" # will be "null" if the ref doesn't match an index
         group="$( jq -r ".targets[\"$currentBranch\"]?.group" $config_file )" # will be "null" if the ref doesn't match an index
-        dest="$( jq -r ".targets[\"$currentBranch\"]?.folder" $config_file )"
         git_env="$( jq -r ".gitEnv" $config_file )"
 
         src="$( realpath $PWD )"
@@ -66,6 +65,9 @@ main () {
         repo_name=${GOGS_REPO_NAME:-"$( basename ${PWD%.git} )"}
         repo_owner=${GOGS_REPO_OWNER_NAME:-"$( basename ${repo_name} )"}
         repo_url="$( jq -r ".repoURL" $config_file )"
+
+        dest="$( jq -r ".targets[\"$currentBranch\"]?.folder" $config_file )"
+        dest="$( substitute "$dest" )"
 
         pre_deploy="$( jq -r ".targets[\"$currentBranch\"]?.preDeploy" $config_file )"
         if [[ -n "$pre_deploy" ]]; then
