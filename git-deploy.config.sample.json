@@ -14,7 +14,7 @@
         "master": {
             "user": "git",
             "folder": "/home/test/public_html/project_subfolder/or/something/",
-            "url": "https://prod.url.to/my/project",
+            "repoUrl": "https://prod.url.to/my/project",
             "preDeploy": "",
             "postDeploy": ""
         }
