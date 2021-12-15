@@ -3,7 +3,7 @@ Description=Git repo deployer
 
 [Service]
 Type=simple
-ExecStart=/usr/local/sbin/git-deploy
+ExecStart=/opt/git-deploy
 
 [Install]
 WantedBy=multi-user.target
