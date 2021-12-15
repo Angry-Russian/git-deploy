@@ -84,7 +84,7 @@ main () {
         fi;
 
 
-        if [[ $user == 'null' || dest == 'null' ]]; then
+        if [[ $user == 'null' || $dest == 'null' ]]; then
             defaultBranch=$( cat HEAD | grep -oP 'refs/heads/\K(.*)' );
             if [[ "$git_env" == "gogs" ]]; then
                 log note '==================================================='
