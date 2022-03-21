@@ -69,7 +69,7 @@ read_pipe () {
             chown "$usr" -R "$dst"
 
             if [[ -n "$post_deploy" ]]; then
-                log note "running pre-deploy script: '$post_deploy'";
+                log note "running post-deploy script: '$post_deploy'";
                 (
                     cd "$dst";
                     run_sanitized "$post_deploy"

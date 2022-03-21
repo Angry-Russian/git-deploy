@@ -55,7 +55,6 @@ main () {
     do
         currentBranch="$( echo $ref | grep -oP '^refs/heads/\K(.*)$' )"
         available_keys=( $( jq -cr ".targets[\"$currentBranch\"] | keys | @tsv" $config_file ) )
-        deploy_config="$( jq -r ".targets[\"$currentBranch\"]?.folder" $config_file )"
         user="$( jq -r ".targets[\"$currentBranch\"]?.user" $config_file )" # will be "null" if the ref doesn't match an index
         group="$( jq -r ".targets[\"$currentBranch\"]?.group" $config_file )" # will be "null" if the ref doesn't match an index
         dest="$( jq -r ".targets[\"$currentBranch\"]?.folder" $config_file )"
@@ -103,10 +102,7 @@ main () {
             exit_code=126;
 
         else
-            log -n note "Deploying"
-            log -n " $repo_name "
-            log -n note "to"
-            log " $dest"
+            log -n note "Deploying $repo_name to $dest"
             log ok "Adding $newrev to deployment pipeline for $dest at pipe $listener"
             echo "$user:$group $src $dest $newrev $post_deploy" >> $listener
         fi
