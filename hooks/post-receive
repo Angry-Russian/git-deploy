@@ -11,6 +11,7 @@ require "libs/log.sh"
 require "libs/checks.sh"
 require "libs/sanitize.sh"
 
+available_config=""
 
 config () {
     log note "looking for config file..."
@@ -27,6 +28,10 @@ config () {
 
     declare -a available_keys=(  )
     listener="$( jq -r ".deployPipe" $config_file )"
+}
+
+get () {
+    echo "$available_config" | jq -r "$1"
 }
 
 substitute () {
@@ -53,20 +58,25 @@ main () {
     exit_code=0;
     while read oldrev newrev ref
     do
-        currentBranch="$( echo $ref | grep -oP '^refs/heads/\K(.*)$' )"
-        available_keys=( $( jq -cr ".targets[\"$currentBranch\"] | keys | @tsv" $config_file ) )
-        user="$( jq -r ".targets[\"$currentBranch\"]?.user" $config_file )" # will be "null" if the ref doesn't match an index
-        group="$( jq -r ".targets[\"$currentBranch\"]?.group" $config_file )" # will be "null" if the ref doesn't match an index
-        dest="$( jq -r ".targets[\"$currentBranch\"]?.folder" $config_file )"
-        git_env="$( jq -r ".gitEnv" $config_file )"
-
         src="$( realpath $PWD )"
+        currentBranch="$( echo $ref | grep -oP '^refs/heads/\K(.*)$' )"
+        available_config=$( jq -cr ".targets[\"$currentBranch\"]" $config_file )
+
+        [[ -z "$available_config" || "$available_config" = "null" ]] && exit 0;
+
+        available_keys=( $( get "keys | @tsv" ) )
+        user="$( get ".user" )" # will be "null" if the ref doesn't match an index
+        group="$( get ".group" )" # will be "null" if the ref doesn't match an index
+        dest="$( get ".folder" )"
+        git_env="$( get ".gitEnv" )"
 
         repo_name=${GOGS_REPO_NAME:-"$( basename ${PWD%.git} )"}
         repo_owner=${GOGS_REPO_OWNER_NAME:-"$( basename ${repo_name} )"}
-        repo_url="$( jq -r ".repoURL" $config_file )"
+        repo_url="$( get ".repoURL" )"
 
-        pre_deploy="$( jq -r ".targets[\"$currentBranch\"]?.preDeploy" $config_file )"
+        pre_deploy="$( get ".preDeploy" )"
+        post_deploy="$( get ".postDeploy" )"
+
         if [[ -n "$pre_deploy" ]]; then
             pre_deploy=$( substitute "$pre_deploy" )
             log note "running pre-deploy script: '$pre_deploy'";
@@ -75,7 +85,6 @@ main () {
             pre_deploy=''
         fi;
 
-        post_deploy="$( jq -r ".targets[\"$currentBranch\"]?.postDeploy" $config_file )"
         if [[ -n "$pre_deploy" ]]; then
             post_deploy="$( substitute "$post_deploy" )"
         else
