@@ -67,15 +67,15 @@ main () {
         available_keys=( $( get "keys | @tsv" ) )
         user="$( get ".user" )" # will be "null" if the ref doesn't match an index
         group="$( get ".group" )" # will be "null" if the ref doesn't match an index
-        dest="$( get ".folder" )"
+        dest=$( substitute "$( get ".folder" )" )
         git_env="$( get ".gitEnv" )"
 
         repo_name=${GOGS_REPO_NAME:-"$( basename ${PWD%.git} )"}
         repo_owner=${GOGS_REPO_OWNER_NAME:-"$( basename ${repo_name} )"}
         repo_url="$( get ".repoURL" )"
 
-        pre_deploy="$( get ".preDeploy" )"
-        post_deploy="$( get ".postDeploy" )"
+        pre_deploy="$( substitute "$( get ".preDeploy" )" )"
+        post_deploy="$( substitute "$( get ".postDeploy" )" )"
 
         if [[ -n "$pre_deploy" ]]; then
             pre_deploy=$( substitute "$pre_deploy" )
@@ -111,7 +111,7 @@ main () {
             exit_code=126;
 
         else
-            log -n note "Deploying $repo_name to $dest"
+            log note "Deploying $repo_name to $dest"
             log ok "Adding $newrev to deployment pipeline for $dest at pipe $listener"
             echo "$user:$group $src $dest $newrev $post_deploy" >> $listener
         fi
