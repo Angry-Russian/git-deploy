@@ -63,9 +63,7 @@ read_pipe () {
             log ok   "Deploying $rev from $src to $dst as $usr";
             oldref=$( cat "$src/HEAD" | { read a b; [[ -n "$b" ]] && echo "$b" || echo "$a"; } );
             mkdir -p "$dst"
-            chown "$usr" -R "$dst"
-            git --git-dir="$src" --work-tree="$dst" checkout -f "$rev" # <- checks out the project in target folder
-            git --git-dir="$src" symbolic-ref -q HEAD "$oldref" # <- fixes a bug where gogs thought the incoming rev was the new default rev
+            git --git-dir="$src" --work-tree="$dst" checkout -f "$rev" -- . # <- checks out the project in target folder
             chown "$usr" -R "$dst"
 
             if [[ -n "$post_deploy" ]]; then
