@@ -54,9 +54,9 @@ read_pipe () {
         # check that the user, source and the revision actually exist
         if [[ ! $( id -u "${usr%:*}" ) ]]; then
             log error "supplied user doesn't exist, ignoring. $usr";
-        elif [[ ! $( git --git-dir="$src" log -n1 > /dev/null 2>&1 ) ]]; then
+        elif [[ ! $( git --git-dir="$src" log -n1 ) ]]; then
             log error "supplied dir is not a git dir or has no commits. $src";
-        elif [[ ! $( git --git-dir="$src" show "$rev" > /dev/null 2>&1 ) ]]; then
+        elif [[ ! $( git --git-dir="$src" show "$rev" ) ]]; then
             log error "supplied dir does not contain the target revision. $src";
         else
             log note "Running deploy script in $PWD"
