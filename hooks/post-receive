@@ -67,13 +67,13 @@ main () {
         available_keys=( $( get "keys | @tsv" ) )
         user="$( get ".user" )" # will be "null" if the ref doesn't match an index
         group="$( get ".group" )" # will be "null" if the ref doesn't match an index
-        dest=$( substitute "$( get ".folder" )" )
         git_env="$( get ".gitEnv" )"
 
         repo_name=${GOGS_REPO_NAME:-"$( basename ${PWD%.git} )"}
         repo_owner=${GOGS_REPO_OWNER_NAME:-"$( basename ${repo_name} )"}
         repo_url="$( get ".repoURL" )"
 
+        dest=$( substitute "$( get ".folder" )" )
         pre_deploy="$( substitute "$( get ".preDeploy" )" )"
         post_deploy="$( substitute "$( get ".postDeploy" )" )"
 
